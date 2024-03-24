@@ -31,15 +31,16 @@ Mentors:
     2.3  [Incorporate  Mifos' new design library](#23-incorporate-mifos-new-design-library)  <br>
     2.4  [Migrate xml to Jetpack compose](#24-migrate-xml-to-jetpack-compose)<br>
     2.5  [Basic implementation of multi-platform](#25-basic-implementation-of-multi-platform)<br>
-    2.6 [Update wallet framework to be make use of Mifos' Android SDK](#26-update-wallet-framework-to-be-make-use-of-mifos-android-sdk)<br>
-    2.7 [Complete migration of Java code to Kotlin](#27-complete-migration-of-java-code-to-kotlin)<br>
-    2.8 [Improving the security framework](#28-improving-the-security-framework)<br>
-    2.9 [Exploring PoC Architecture for Open Wallet Foundation Alignment](#29-exploring-poc-architecture-for-open-wallet-foundation-alignment)<br>
+    2.6  [Implemented Playstore release github action pipeline](#26-implement-playstore-release-github-action-pipeline)<br>
+    2.7 [Update wallet framework to be make use of Mifos' Android SDK](#27-update-wallet-framework-to-be-make-use-of-mifos-android-sdk)<br>
+    2.8 [Complete migration of Java code to Kotlin](#28-complete-migration-of-java-code-to-kotlin)<br>
+    2.9 [Improving the security framework](#29-improving-the-security-framework)<br>
+    2.10 [Exploring PoC Architecture for Open Wallet Foundation Alignment](#210-exploring-poc-architecture-for-open-wallet-foundation-alignment)<br>
 3. [Contributions To Mifos](#3-contributions-to-mifos)
 4. [Week Wise Breakdown](#4-week-wise-breakdown)<br>
     4.1  [Community Bonding Period (4 May - 28 May)](#41-community-bonding-period-4-may---28-may)<br>
-    4.2  [Phase 1 (29 May - 9 July)](#42-phase-1-29-may---9-july)<br><!--  TODO along with the breakdown image -->
-    4.3  [Phase 2 (14 July - 21 Aug)](#43-phase-2-14-july---21-aug)<br><!--  TODO along with the breakdown image -->
+    4.2  [Phase 1 (29 May - 9 July)](#42-phase-1-29-may---9-july)<br>
+    4.3  [Phase 2 (14 July - 21 Aug)](#43-phase-2-14-july---21-aug)<br>
     4.4 [Post phase 2 (After Aug 28)](#44-post-phase-2-after-aug-28)
 5.  [Why Am I The Right Person](#5-why-am-i-the-right-person)
 6.  [Current Area of Study](#6-current-area-of-study)
@@ -70,22 +71,106 @@ The project focuses on the enhancement and refinement of a feature-rich and secu
 
 ## **2.2 Integrate Mifos' notifications framework**
 
-<br><br><br><br><br>
-
 ## **2.3 Incorporate  Mifos' new design library**
+- Currently, our Android projects display a variety of user interfaces, with even individual applications experiencing inconsistencies in UI elements. To address this issue and ensure uniformity both within and across our apps, we need to develop a new design library. This will establish a consistent UI framework for all our projects.
 
-# **2.4 Migrate xml to Jetpack compose**
+- At the time of drafting this proposal, Mifos is utilizing an outdated version of the [Mifos UI Library](https://github.com/openMF/mifos-ui-library) that relies on XML. It's important to acknowledge that this will become obsolete once we transition our project to Compose. Currently, we are defining our reusable components within the :core:ui module of the project.
 
+- The integration of a new UI library will be contingent upon the nature and structure of this library. Should it contain components common across all our Android projects, we could seamlessly replace the existing definitions with those provided by the library. For instance, consider a **Login Screen** that appears in all our projects. By defining this screen within our new library and deploying it, we can ensure consistent UI across all projects.
 
-# **2.5 Basic implementation of multi-platform**
+## **2.4 Migrate XML to Jetpack compose**
+- Converting the project to jetpack compose is of utmost priority for this years GSoC. Currently we are using Fragment + Compose approach to migrate our project. We are designing compose UI and then setting the content in our fragments. This typically looks like the following
+```kotlin
+    setContent {
+        AppTheme {
+            ComposeScreen() 
+        }
+    }
+```
+- This method though not wrong, leads you to a code that is bloated and outside of the Compose mentality. Hence we need to start introducing the **Navigation Compose**. The way it will work in our project is that each **NavController** will be associated with a single NavHost composable. The **NavHost** would link the NavController with a navigation graph that specifies the composable destinations that we should be able to navigate between. As we navigate between composables, the content of the NavHost is automatically recomposed. Each composable destination in our navigation graph is associated with a route which is basically a String that defines the path to your composable
 
-# **2.6 Update wallet framework to be make use of Mifos' Android SDK**
+- We will need to define a file lets say `AppNavigation.kt` to define screen names and routes for Navigation. This would typically look like:
+```kotlin
+    enum class Screen {
+        Screen1, // this will be HomeScreen in our project
+        Screen2, // this will be PaymentsScreen in our project
+        ... // other screens
+    }
+    sealed class NavigationItem(val route: String) {
+        object Screen1 : NavigationItem(Screen.Screen1.name)
+        object Screen2 : NavigationItem(Screen.Screen2.name)
+        ... // other screens
+    }
 
-# **2.7 Complete migration of Java code to Kotlin**
+```
+-  We then need to define **NavHost** with our screens in `AppNavHost.kt`. A demo implementation would like the following: 
 
-# **2.8 Improving the security framework**  
+```kotlin
+    @Composable
+    fun AppNavHost(
+        modifier: Modifier = Modifier,
+        navController: NavHostController,
+        startDestination: String = NavigationItem.Splash.route,
+        ... // other parameters
+    ) {
+        NavHost(
+            modifier = modifier,
+            navController = navController,
+            startDestination = startDestination
+        ) {
+            composable(NavigationItem.Splash.route) {
+                SplashScreen(navController)
+            }
+            composable(NavigationItem.Screen1.route) {
+                Screen1(navController)
+            }
+            ... // other composables
+    }
+    
+```
 
-# **2.9 Exploring PoC Architecture for Open Wallet Foundation Alignment** 
+- After this is done we will call *AppNavHostinside* inside our `MainActivity.kt` file.This will lay the foundation for initial setup and will be crucial when we refactor the **Bottom Navigation** to compose. 
+
+- Since we already have a lot of resusable components in our project, migrating the project to compose while integrating NavigationCompose shouldn't take a lot of time. I will communicate any UI revamp ideas with my mentor and will implement the same if he gives me a nod
+
+## **2.5 Basic implementation of multi-platform**
+- Implementing *Kotlin Multiplatform* (KMP) is another huge undertaking in this years GSoC. Once implemented, it will upgrade our native android application to a cross platform application
+
+- Our project is currently broken down into a few modules and I believe we can break it down further based on different features. Each feature module handles its own scope of responsibility, usually covering the functionality of a single screen or a closely related group of screens. Right now we only have `:feature:auth` module and we can extend it to different such features. We can create a *database module* inside of core to find all the necessary classes for our local database
+
+- We can be ambitious and take `:data` module out of core and treat it as a separate module. It will handle the data structure serving the feature modules in a well-separated manner.A data module can be associated with multiple feature modules to ensure that each feature module has complete access to all the necessary data.Every data module includes the necessary modules for **Koin**, module-specific data classes, and the repository interface and implementation
+
+    ![Multi Module Setup](multi_module.png)
+
+- To ensure cross platform application KMP shares the business logic between the platforms and it is of utmost importance that we migrate anything java related to kotlin. That includes migrating *SharedPreference* to **Data Store**, *Retrofit* to **Ktor**, *Hilt* to **Koin** and *DbFlow* to **SqlDelight**. We also have the option to choose between Koin & Kotlin-Injection and also between SqlDelight & Realm. The end purpose of their alternatives are the same and hence I will discuss the better alternative with my mentor before I start implementing any of them
+
+- Until this point we have divided our project into different features and now we have to share this with the iOS platform.The iOS app can depend on one framework generated by the Kotlin Multiplatform module. When you use several modules, you need to add an extra module depending on all of the modules you're using, called an umbrella module, and then you need to configure a framework containing all of the modules, called an umbrella framework.
+
+![Umbrella Framework](umbrella.png)
+
+- Because the native app depends only on the shared **Umbrella module** we need to allow an app to access submodules hidden under this Umbrella.All the submodules which we want to expose to the app should be added to the *shared/build.gradle.kts* script as an api dependency.Similarly we add the modules which should not be accessible from the native app, but this time we use an implementation dependency.
+
+## **2.6 Implement Playstore release github action pipeline**
+
+## **2.7 Update wallet framework to be make use of Mifos' Android SDK**
+
+## **2.8 Complete migration of Java code to Kotlin**
+In the process of migrating to Kotlin, we significantly enhance our codebase by adopting Kotlin's more concise syntax, which notably reduces boilerplate code. Furthermore, Kotlin's built-in null safety and powerful features like coroutines and flows add substantial value to our development process. However, our ultimate objective is to transition our project to **Kotlin Multiplatform** (KMM). To achieve this, it's imperative that our entire codebase is converted to Kotlin. At the time of drafting this proposal, **only 1.6%** of the project remains to be migrated.
+When I first started contributing to this project, a considerable portion needed to be transitioned from Java to Kotlin. Therefore, I initiated the conversion process on a package-by-package basis, systematically working towards our goal of a fully Kotlin-based codebase.
+
+At the time of drafting this proposal the following files are still haven't been migrated to kotlin: 
+- <font color="green">VerifyUser.java</font>
+- <font color="green">WrapContentHeightViewPager.java</font>
+- <font color="green">FetchAccounts.java</font>
+- <font color="green">FetchAccountTransaction.java</font>
+- <font color="green">RegisterUser.java</font>
+- <font color="green">DownloadTransactionReceipt.java</font>
+
+Although this task is not of immediate high priority, it plays a critical role in the grand scheme of our project objectives. Therefore, I plan to submit pull requests for these changes as promptly as possible. Should I encounter any challenges in completing this task before the Google Summer of Code timeframe, I am committed to resolving it before the conclusion of the first coding phase.
+
+# **2.9 Improving the security framework**  
+
+# **2.10 Exploring PoC Architecture for Open Wallet Foundation Alignment** 
 
 # **3. Contributions to Mifos**
 Below are the links to my contributions at the time of submitting this proposal : 
