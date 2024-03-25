@@ -36,7 +36,7 @@ Mentors:
     2.8 [Complete migration of Java code to Kotlin](#28-complete-migration-of-java-code-to-kotlin)<br>
     2.9 [Improving the security framework](#29-improving-the-security-framework)<br>
     2.10 [Exploring PoC Architecture for Open Wallet Foundation Alignment](#210-exploring-poc-architecture-for-open-wallet-foundation-alignment)<br>
-3. [Contributions To Mifos](#3-contributions-to-mifos)
+3. [Contributions To Mifos](#3-contributions-to-mifos)<br>
 4. [Week Wise Breakdown](#4-week-wise-breakdown)<br>
     4.1  [Community Bonding Period (4 May - 28 May)](#41-community-bonding-period-4-may---28-may)<br>
     4.2  [Phase 1 (29 May - 9 July)](#42-phase-1-29-may---9-july)<br>
@@ -54,7 +54,7 @@ Mentors:
 14.  [What motivates me to work with mifos](#14-what-motivates-me-to-work-with-mifos-for-gsoc)
 15.  [Previous Participation in GSoc](#15-previous-participation-in-gsoc)
 16.  [Application to multiple Orgs](#16-application-to-multiple-orgs)
-<br><br><br><br><br>
+<br><br><br><br><br><br><br>
 
 
 # **1. Project Idea**
@@ -62,14 +62,47 @@ Mentors:
 Abstract
 - 
 
-The project focuses on the enhancement and refinement of a feature-rich and secure Mobile Wallet application tailored for Government to Person (G2P) payments, demonstrating a potent tool for fintechs and financial institutions. Originating as a Google Summer of Code initiative from 2017-2023, the project delivered the initial mobile wallet framework, evolving into a sophisticated reference application with two primary apps: PixieCollect and MifosPay, later consolidating focus on MifosPay. The developmental trajectory of the project saw significant milestones: integration with Mojaloop transaction flows, user experience enhancements, support for Kotlin, and implementation of standing instructions and merchant transactions. Further advancements include integration with Fineract CN, multi-theme support, migration to Kotlin, and a transition towards a multiplatform approach using Kotlin multi-platform. The project aims, in 2024, to finalize G2P functionalities, ensuring production-readiness, improving security, and adopting modern development practices such as Jetpack Compose and leveraging Mifos' Android SDK. It underscores a commitment to evolving into a generic wallet management system through the Mifos X framework, incorporating cutting-edge features like the latest Payment Hub EE version, a new notifications framework, and a redesigned architecture to align with the Open Wallet Foundation's principles. This ambitious endeavor promises to redefine the landscape of mobile wallets, emphasizing security, extensibility, and a seamless user experience for G2P payments and beyond.
+- The project focuses on the enhancement and refinement of a feature-rich and secure Mobile Wallet application tailored for Government to Person (G2P) payments, demonstrating a potent tool for fintechs and financial institutions. Originating as a Google Summer of Code initiative from 2017-2023, the project delivered the initial mobile wallet framework, evolving into a sophisticated reference application with two primary apps: PixieCollect and MifosPay, later consolidating focus on MifosPay. The developmental trajectory of the project saw significant milestones: integration with Mojaloop transaction flows, user experience enhancements, support for Kotlin, and implementation of standing instructions and merchant transactions. 
+
+- Further advancements include integration with Fineract CN, multi-theme support, migration to Kotlin, and a transition towards a multiplatform approach using Kotlin multi-platform. The project aims, in 2024, to finalize G2P functionalities, ensuring production-readiness, improving security, and adopting modern development practices such as Jetpack Compose and leveraging Mifos' Android SDK. It underscores a commitment to evolving into a generic wallet management system through the Mifos X framework, incorporating cutting-edge features like the latest Payment Hub EE version, a new notifications framework, and a redesigned architecture to align with the Open Wallet Foundation's principles. This ambitious endeavor promises to redefine the landscape of mobile wallets, emphasizing security, extensibility, and a seamless user experience for G2P payments and beyond.
 <br>
 
 # **2. Implementation Details**
 
 ## **2.1 Integrate latest version of Payment Hub EE**
+- 
 
 ## **2.2 Integrate Mifos' notifications framework**
+- The current notification sub-system in Mifos provides a service to send notifications to a set of user. The service maps a notification message to recipient users and thus requires a list of user identifiers as parameter.At the point of notification generation, the list of users to be notified is evaluated in real time based on their organization, role and permissions
+
+- The notification framework enables notification in fineract to work as follows: On event of a notification generation, the notification service is called with a notification message and a list of user identifiers that form the audience of the notification. For events that need sending notifications to a set of users based on the combination of their organization and role, the determination of the audience is done in real time. However, the approach is not optimum since there are multiple fetches from the datasource for the same data.
+
+- A **topic-subscription model** is used to optimize the evaluation of audience. Topics are created for each organization and role combination. When users are added to an organization and assigned roles, they are added as subscribers to the relevant topics. Now, when a notification has to be sent to users having a particular role in an organization, the relevant topic is fetched and its subscribers are set as audience of the message
+
+- From my research on Mifos' notification framework, I came across *Courage Angeh* who had contributed to this framework. She had documented all of her work in a gist that can be found [here](https://gist.github.com/Anh3h/ad945ffeb2064dc31f103e150879f0c6). Her report entails the 
+**Use Case**, **Implementation Details** and the **Tables** that can be found in this [Google Docs](https://docs.google.com/document/d/1dBEm3S7OBQFQDmwkAygAng3s_0nGHLvXVujISNbJbsA/edit?usp=sharing)
+
+- Based on the above research we may have to change the structure of **Notification Payload** to also accept the parameter for read/unread messages. It will look something like this : 
+```kotlin
+@Parcelize
+data class NotificationPayload(
+    var title: String,
+    var body: String,
+    var timestamp: String,
+    var isRead: Boolean: // if notification was read
+) : Parcelable
+
+```
+- We can follow this tentative approach to fulfil merchant request-to-pay:
+    - When a merchant initiates a request-to-pay from the mobile app, a new record is created in the *request_to_pay* table
+    - The creation of a new request-to-pay fires an event (e.g., NEW_REQUEST_TO_PAY_CREATED)
+    - An event listener listening to this event generates the notification content (e.g., "You have a new payment request") and retrieves the merchant's entity id
+    - The system gets the topic mapped to the merchant's entity id and *member_type* (assuming merchant has a unique member type) from the *topic* table
+    - The system retrieves the subscribers to the topic from the *topic_subscriber* table using the topic id
+    - For each subscriber, a notification is created and the subscriber (user) id is mapped to the created notification id, stored in the *notification_mapper* table
+    - The *notification_mapper* table is queried to get a user’s notifications, which can then be sent out
+
+- This is only an idea and will be revised in case my mentor says so. I feel once we have an api and a clear understanding of what to implement then it shouldn't take a lot of time in the front end
 
 ## **2.3 Incorporate  Mifos' new design library**
 - Currently, our Android projects display a variety of user interfaces, with even individual applications experiencing inconsistencies in UI elements. To address this issue and ensure uniformity both within and across our apps, we need to develop a new design library. This will establish a consistent UI framework for all our projects.
@@ -129,7 +162,7 @@ The project focuses on the enhancement and refinement of a feature-rich and secu
     
 ```
 
-- After this is done we will call *AppNavHostinside* inside our `MainActivity.kt` file.This will lay the foundation for initial setup and will be crucial when we refactor the **Bottom Navigation** to compose. 
+- After this is done we will call *AppNavHost* inside our `MainActivity.kt` file.This will lay the foundation for initial setup and will be crucial when we refactor the **Bottom Navigation** to compose. 
 
 - Since we already have a lot of resusable components in our project, migrating the project to compose while integrating NavigationCompose shouldn't take a lot of time. I will communicate any UI revamp ideas with my mentor and will implement the same if he gives me a nod
 
@@ -144,13 +177,19 @@ The project focuses on the enhancement and refinement of a feature-rich and secu
 
 - To ensure cross platform application KMP shares the business logic between the platforms and it is of utmost importance that we migrate anything java related to kotlin. That includes migrating *SharedPreference* to **Data Store**, *Retrofit* to **Ktor**, *Hilt* to **Koin** and *DbFlow* to **SqlDelight**. We also have the option to choose between Koin & Kotlin-Injection and also between SqlDelight & Realm. The end purpose of their alternatives are the same and hence I will discuss the better alternative with my mentor before I start implementing any of them
 
-- Until this point we have divided our project into different features and now we have to share this with the iOS platform.The iOS app can depend on one framework generated by the Kotlin Multiplatform module. When you use several modules, you need to add an extra module depending on all of the modules you're using, called an umbrella module, and then you need to configure a framework containing all of the modules, called an umbrella framework.
+- Until this point we have divided our project into different features and now we have to share this with the iOS platform.The iOS app can depend on one framework generated by the Kotlin Multiplatform module. When we use several modules, we will need to add an extra module depending on all of the modules we're using, called an umbrella module, and then we need to configure a framework containing all of the modules, called an umbrella framework.
 
 ![Umbrella Framework](umbrella.png)
 
-- Because the native app depends only on the shared **Umbrella module** we need to allow an app to access submodules hidden under this Umbrella.All the submodules which we want to expose to the app should be added to the *shared/build.gradle.kts* script as an api dependency.Similarly we add the modules which should not be accessible from the native app, but this time we use an implementation dependency.
+- Because the native app depends only on the shared **Umbrella module** we need to allow an app to access submodules hidden under this Umbrella. All the submodules which we want to expose to the app should be added to the *shared/build.gradle.kts* script as an api dependency.Similarly we add the modules which should not be accessible from the native app, but this time we use an implementation dependency.
 
 ## **2.6 Implement Playstore release github action pipeline**
+- Right now we are pushing all of our code to development. I suggest we create another branch lets call it *release* whose purpose would be to deploy product to playstore and this would ensure a proper flow of CI/CD
+
+- **Fastlane** is the easiest way to automate beta deployments and releases for your iOS and Android apps. It handles all tedious tasks, like generating screenshots, dealing with code signing, and releasing your application. Initially we will need a *Google Play Credential file (.json)* for the Fastlane to deploy our apps and assuming that Mifos would have their own google playstore account we will easily able to generate this file
+
+- 
+
 
 ## **2.7 Update wallet framework to be make use of Mifos' Android SDK**
 
@@ -173,51 +212,71 @@ Although this task is not of immediate high priority, it plays a critical role i
 # **2.10 Exploring PoC Architecture for Open Wallet Foundation Alignment** 
 
 # **3. Contributions to Mifos**
-Below are the links to my contributions at the time of submitting this proposal : 
-### **Merged Pull Requests** 
+Ever since GSoC 2023 concluded, I have kept contributing to Mifos and this contribution is not just limited to **Mobile Wallet** but also extends to **Mifos Mobile** and **Mifos Passcode**
+
+Below are links to some of my notable contributions at the time of submitting this proposal : 
+
+### **Merged Pull Requests** for Mobile Wallet
 <ul>
-1. <a href="https://github.com/openMF/mifos-mobile/pull/1926" >PR #1926: Modified Error message in case of wrong endpoint</a>
+1. <a href="https://github.com/openMF/mobile-wallet/pull/1579" >PR #1579: Migrated Finance Screen to compose</a>
 <br>
-2. <a href="https://github.com/openMF/mifos-mobile/pull/1927" >PR #1927: Fixes the behaviour of filters in savings section</a>
+2. <a href="https://github.com/openMF/mobile-wallet/pull/1548" >PR #1548: Migrated Payments Screen to compose</a>
 <br>
-3. <a href="https://github.com/openMF/mifos-mobile/pull/1930" >PR #1930: Fixes unresponsive nature of 'Change Passcode' in Settings</a>
+3. <a href="https://github.com/openMF/mobile-wallet/pull/1547" >PR #1547: Migrated Profile Screen to compose</a>
 <br>
-4. <a href="https://github.com/openMF/mifos-mobile/pull/1981" >PR #1981: Fixes the white background in dark mode</a>
+4. <a href="https://github.com/openMF/mobile-wallet/pull/1508" >PR #1508: Migrated Settings Screen to compose</a>
 <br>
-5. <a href="https://github.com/openMF/mifos-mobile/pull/1984" >PR #1984: Fixes the scrolling feature in landscape mode</a>
+5. <a href="https://github.com/openMF/mobile-wallet/pull/1538" >PR #1538: Migrated FAQ Screen to compose</a>
 <br>
-6. <a href="https://github.com/openMF/mifos-mobile/pull/2017" >PR #2017: Fixed the crashing of app when changing main mobile theme</a>
+6. <a href="https://github.com/openMF/mobile-wallet/pull/1426" >PR #1426: Migrated Login Screen to compose</a>
 <br>
-7. <a href="https://github.com/openMF/mifos-mobile/pull/1910" >PR #1910: Fixes App Crash when orientation is changed to landscape mode</a>
+7. <a href="https://github.com/openMF/mobile-wallet/pull/1573" >PR #1573: Introduced Detekt for static code analysis</a>
 <br>
-8. <a href="https://github.com/openMF/mifos-mobile/pull/1904" >PR #1904: Added Country Code Picker in the Signup form</a>
+8. <a href="https://github.com/openMF/mobile-wallet/pull/1524" >PR #1524: Rectified Github Workflow of the project</a>
 <br>
-9. <a href="https://github.com/openMF/mifos-mobile/pull/1899" >PR #1899: Fixes crashing of app when selecting an empty Product ID</a>
+9. <a href="https://github.com/openMF/mobile-wallet/pull/1526" >PR #1526: Rectified Authentication Logic of the project</a>
+<br>
+10. <a href="https://github.com/openMF/mobile-wallet/pull/1462" >PR #1462: Fixed app crash when selecting FAQ</a>
+<br>
+11. <a href="https://github.com/openMF/mobile-wallet/pull/1510" >PR #1510: API package from java to kotlin</a>
+<br>
+12. <a href="https://github.com/openMF/mobile-wallet/pull/1540" >PR #1540: Checkstyle for all modules</a>
+<br>
 </ul>
+
+- I have a total of **35 Merged Pull Requests** in mobile wallet. You can find all of my merged PRs [here](https://github.com/openMF/mobile-wallet/pulls?page=1&q=is%3Amerged+is%3Apr+author%3APratyushSingh07)
+
+###  **Merged Pull Requests** for Mifos Mobile
+<ul>
+1. <a href="https://github.com/openMF/mifos-mobile/pull/2436" >PR #2436: Migrated Login Screen to compose</a>
+<br>
+2. <a href="https://github.com/openMF/mifos-mobile/pull/2456" >PR #2456: Migrated User Profile Screen to compose</a>
+<br>
+3. <a href="https://github.com/openMF/mifos-mobile/pull/2459" >PR #2459: Migrated Registration Screen to compose</a>
+<br>
+4. <a href="https://github.com/openMF/mifos-mobile/pull/2257" >PR #2257: Migrated AboutUs Screen to compose</a>
+<br>
+5. <a href="https://github.com/openMF/mifos-mobile/pull/2307" >PR #2307: Fixed Unexpected Biometric Prompt</a>
+<br>
+6. <a href="https://github.com/openMF/mifos-mobile/pull/2499" >PR #2499: Updated endpoint for debug</a>
+<br>
+7. <a href="https://github.com/openMF/mifos-mobile/pull/2430" >PR #2430: Refactored Client Charges to stateflow</a>
+<br>
+8. <a href="https://github.com/openMF/mifos-mobile/pull/2499" >PR #2499: Update readme with current version of the project</a>
+</ul>
+
+- I have a total of **83 Merged Pull Requests** in mifos mobile alone. You can find all of my merged PRs [here](https://github.com/openMF/mifos-mobile/pulls?page=1&q=is%3Apr+is%3Amerged+author%3APratyushSingh07)
 
 ### **Open Pull Requests**
-<ul>
-1. <a href="https://github.com/openMF/mifos-mobile/pull/2034" >PR #2034: Fingerprint Authentication in the Passcode Activity</a>
-<br>
-2. <a href="https://github.com/openMF/mifos-mobile/pull/1929" >PR #1929: Fixes background color of Passcode with the theme</a>
-<br>
-3. <a href="https://github.com/openMF/mifos-mobile/pull/1912" >PR #1912: Fixes Scrolling in landscape mode</a>
-<br>
-4. <a href="https://github.com/openMF/mifos-mobile/pull/1908" >PR #1908: Fixes duplication in Material Auto Complete Text View</a>
-<br>
-5. <a href="https://github.com/openMF/mifos-mobile/pull/2049" >PR #2049: Allows User to enter the correct passcode even after three unsuccessful tries</a>
-<br>
-6. <a href="https://github.com/openMF/mifos-mobile/pull/1938" >PR #1938: Offline Support in the home fragment</a>
-<br>
-7. <a href="https://github.com/openMF/mifos-mobile/pull/2002" >PR #2002: Fixed the app to remember language set by the user before logging out</a>
-<br>
-</ul>
+- At the time of drafting this proposal I dont have any PR across any of Mifos's project
 
-- I intend to continue contributing to the codebase even after submitting my proposal and expect that there may be changes made to the Pull Requests that I have opened. Therefore, I am providing the links to those PRs [here](https://github.com/openMF/mifos-mobile/pulls/PratyushSingh07)
+- I intend to continue contributing to the codebase even after submitting my proposal and expect that there may be changes made to the Pull Requests that I have opened. Therefore, I am providing the links to those PRs [here](https://github.com/openMF/mobile-wallet/pulls/PratyushSingh07)
 
 ### **Issues Reported**
 - I had opened a total of **15 issues** that mainly focused on bugs that were present in the codebase and also on the features that were absent from the mifos mobile at the time . Some of them are still open and have PRs either by me or from my fellow contributors 
 - All of my open and closed issues can be accessed from [here](https://github.com/openMF/mifos-mobile/issues/created_by/PratyushSingh07) 
+
+Besides contributing to the various projects, I have also dedicated my time to reviewing Pull Requests raised by my fellow contributors and helping them onboard in our open source community. Ever since last years GSoC concluded, I have been actively connected to Mifos
 
 # **4. Week Wise Breakdown**
 
@@ -229,47 +288,37 @@ Below are the links to my contributions at the time of submitting this proposal 
 - Discuss any suggestions and changes to the project. There could modifications, new additions or amendments; it would be better to go over these early 
 
 ### *Week 2*
-- Go Through Mifos-Mobile codebase 
-- Take reference from android client and try to implement features that are currently absent in mifos-mobile
+- Go Through Mobile Wallet codebase 
+- Address issues that can be a hurdle during the GSoC
 - Go through the Open Banking API and related documentations 
 
 ### *Week 3*
-- Discuss the working of the existing application with the mentor. Discuss the implementations of the new features
+- Discuss the working of the existing application with the mentor 
 - Go over the new design in detail and ask for changes and suggestions
-- Discuss the changes that need to take place in the frontend to accommodate  for the breaking changes
+- Migrate the project to kotlin 
 
 ## **4.2 Phase 1 (27 May - 12 July)**
 
 ### *Week 4*
-
-- I will start off gradually with the migration from MVP to MVVM architectural style
-- The order that I will follow is : 
-    - Splash Activity
-    - Login Activity
-    - Registration Fragment
-    - PassCode Activity
-    - HomeOld Fragment 
-    - Home Fragment and so on
-- This order is somewhat sequential and will be one of the first steps to be undertaken
-- I would also take inputs from my mentors and if the need arises, change the order of the migration 
+- I will start off by picking up screens that are yet to be migrated to **compose**
+- In the process, I shall remove fragments and handle navigation with compose itself
+- I am already contributing to this task and I assume we can be done within a week
 
 ### *Week 5*
-
-- I would dedicate this week to the implementation of the Navigation graph
-- I would start off by grouping the fragments that are connected in a sequential flow and map out a graph for the same in the xml
-- This would require the addition of FragmentContainerView in certain activities which will allow further FragmentTransaction operations on the FragmentContainerView and provide a consistent timing for lifecycle events.
+- Before moving to KMP, I would like to integrate **Mifos's Android SDK**
+- Right now the SDK uses retrofit so we wont be able to use it in our shared module
+- If we go with this then we will have to create an abstraction over it, and provide the native/iOS implementation 
 
 ### *Week 6*
 
-- This week would be reserved for the migration from dagger to hilt & also for the integration of coroutines in the project
-- Considering the fact that we need to write unit tests as well, Hilt will make it easier to write unit tests for the code by allowing us to easily swap out dependencies with mock objects 
-- Hence it will be better to get on with this at the earliest so that we can lay foundation for a better unit test phase
+- I will start off with **KMP** implementation in this week
+- Will make use of umbrella module so that iOS can also share the business logic 
+- Migrate from retrofit to ktor & also from Hilt to Koin
 
 ### *Week 7*
-
-- In this, week I will replace existing api layer from self service fineract to Open Banking
-- We can take reference from the [Open Banking App](https://github.com/openMF/open-banking-app) while implementing it in our project 
-- I will be communicating with the mentors and taking their valuable inputs especially when dealing with the endpoints that we have to hit  
+- Migrate from DbFlow to SqlDelight
+- Optionally migrate from SharedPreference to DataStore 
+- Start writing UI for iOS part
 
 ### *Week 8 and Rest of Phase 1*
 
@@ -277,45 +326,33 @@ Below are the links to my contributions at the time of submitting this proposal 
 - Prepare a report for evaluation
 - Discuss brief plan for Phase 2 with the mentors
 
-
 ## **4.3 Phase 2 (12 July - 26 Aug)**
 
 ### *Week 10*
-
-- Rocket chat will provide users with the support and facility of fast solutions to their queries. Rocket chat will provide users to communicate securely in real-time.
- <!-- refer rocket chat lib here https://gist.github.com/ShivangiSingh17/67b6041387c1e281caa7df23347f549e -->
-- Shivangi singh had already updated the callbacks in the library and had further added lifecycle to decline requests . The library can be found [here](https://github.com/ShivangiSingh17/mifos-Rocket.Chat)
-- Now all is left to be done is the integration into the project and I will integrate this once I get the updated *APIs* during the GSoC period
+- Integrate Mifos's **Notification Framework** based on my research
+- Last year we had sessions on PaymentHub and if something similar happens this year then it will be beneficial
+- Connect with backend team to understand the requirement
 
 ### *Week 11*
-
-- I will dedicate this week for the integration of mojaloop via the payment hub. Currently Mobile wallet already has this feature and the same can be taken as a reference while implementing it in mifos mobile
-- I will consult with my mentor the API endpoints that needs to be hit for transactions, registrations, identification and so on
+- Integrate latest version of **Payment Hub** in mobile wallet project
+- I will consult with my mentor the API endpoints that needs to be hit for transactions, registrations, identification and so on before I start with the integration
+- All of this will be done keeping in mind our use cases for G2P
 
 ### *Week 12*
-
-- I shall be writing unit tests for the data layer in this week of GSoC
-- Uptill here we would have migrated a certain portion of our project to MVVM and hence the tests can now be written keeping the new architecture in mind
-- I shall be using Mockito framework to write the tests
+- I will research as to how I can improve the existing **security framework** of our project
+- Being a banking application I know the risks it possess and I will discuss with my mentor before I start working on this project
+- Discuss about **Open Wallet Foundation** with my mentor and how our existing application fits in this movement
 
 ### *Week 13* 
+- Assuming that by the end of this year's GSoC we have published our **UI library** then we can start using them in the android section of our project
+- Create a Playstore release github action pipeline with jobs to check the iOS part of our app
 
-- This week will be dedicated to performing the UI tests using espresso whose dependencies are already present in the gradle
-- We will have decent amount of changes to the UI uptill here and hence tests that cover all the screens must be put in place
-- This will ensure that the views are displayed correctly and look the way they're supposed to.Besides it will ensure that the interactions are handled correctly.
+### *Week 14 and Rest of Phase 2*
 
-### *Week 14* 
-
-- After writing all the unit tests I will add appropriate jobs in the existing workflow to run these tests
-- Running tests regularly and automating the testing process can save a lot of time and prevent issues from arising in the codebase
-
-### *Week 15 and Rest of Phase 2*
-
-- If the mentors permit then I would like to implement my own ideas. Considering the ideas aren't that cumbersome it will work out even if its accomplished at the end of the project
 - *Buffer* to complete any remaining tasks
 - Prepare report for evaluation
 
-    ![Priority Chart](PriorityChart.jpg)
+![Priority Chart](priority_chart.png)
 
 ## **4.4 Post Phase 2 (After Aug 26)**
 - Discuss the project's outcome with my mentors and devise a plan of action for future contributions
@@ -323,9 +360,11 @@ Below are the links to my contributions at the time of submitting this proposal 
 
 
 # **5. Why am I the right person ?**
-I have been doing Android Application Development for more than one year now. I have gained
+I have been doing Android Application Development for more than two year now. I have gained
 proficiency in it by doing multiple Internships, several Open Source Contributions as well as
-Hackathons.I am quite conversant with Android Architectural Components, MVVM, activities, fragments, support libraries, version control, Networking Services, Firebase, UI Development, Jetpack Compose etc.<br>
+Hackathons.I am quite conversant with Android Architectural Components, MVVM, jetpack compose, support libraries, version control, Networking Services, Firebase, Dependency Injection etc
+
+Moreover, I had contributed to Mifos last year as well and successfully completed the project that I was assigned. Furthermore, I am now accustomed to the mobile wallet project since I have been contributing to it for the last 3 months
 
 # **6. Current area of study**
 I am pre final year student pursuing **Information Science and Engineering** at Dayananda Sagar College of Engineering.
@@ -422,7 +461,7 @@ Mifos Initiative's commitment to open-source software is essential for the susta
 <br>
 
 # **15. Previous Participation in GSoC**
-Yes, I had participated in Google Summer of Code 2023 with this very organization and I would love to be a part this year as well
+Yes, I had participated in Google Summer of Code 2023 with this very organization and I would love to be a part of Mifos this year as well
 <br>
 
 # **16. Application to multiple orgs**
