@@ -70,7 +70,15 @@ Abstract
 # **2. Implementation Details**
 
 ## **2.1 Integrate latest version of Payment Hub EE**
-- 
+- Payment Hub EE is a gateway and integration layer enabling financial institutions (DFSPs) to seamlessly connect to external payment systems and operational control center to manage and monitor the transactions flowing through these systems. Payment Hub EE supports **Mobile Money & Merchant payments**, **Bulk Payments & G2P**, **Open Banking** among other digital payment use cases
+
+- The Payment Hub EE abstracts out the complexity of connecting directly to the APIs of an external payment system and provides a scalable and sophisticated orchestration layer powered by Zeebe to elegantly route payments and transactions across various microservices and APIs facilitating the flow of transactions amongst the core banking system, channel applications, and external payment systems. 
+
+- To integrate this in our current setup we may have to replace the existing APIs with the payment hub apis that are listed [here](https://app.swaggerhub.com/apis/myapi943/payment-hub_ap_is/1.0#/PartyIdInfo). Moreover, we also need to satisfy our G2P use cases and apis related to those can be found [here](https://app.swaggerhub.com/apis/rrkas/open-g_2_p_erp/1.0). Currently the latest version of Payment Hub is **v1.13.0** with G2P Sandbox chart v1.5.0 which was released on 24th March 2024.
+
+- By the time of implementation of this idea there may be changes in the version and I will adopt to those changes accordingly in consultation with my mentor. Since we will be dealing with real time  data such as transfers and other transaction we may need to implement sockets in such scenario. This is only a hypothesis and I believe to gain more insight once I actually start working on this under the guidance of my mentor
+
+- Again like last year if we have a session on payment hub then it will help me in understanding the use cases a lot better and thus improve the way in which I integrate this in my app
 
 ## **2.2 Integrate Mifos' notifications framework**
 - The current notification sub-system in Mifos provides a service to send notifications to a set of user. The service maps a notification message to recipient users and thus requires a list of user identifiers as parameter.At the point of notification generation, the list of users to be notified is evaluated in real time based on their organization, role and permissions
@@ -188,10 +196,93 @@ data class NotificationPayload(
 
 - **Fastlane** is the easiest way to automate beta deployments and releases for your iOS and Android apps. It handles all tedious tasks, like generating screenshots, dealing with code signing, and releasing your application. Initially we will need a *Google Play Credential file (.json)* for the Fastlane to deploy our apps and assuming that Mifos would have their own google playstore account we will easily able to generate this file
 
-- 
+- We can declare various lanes in Fastfile which can have different behaviours or simply we can call them tasks. Lets say we have to deploy our application for the **RELEASE** track. Then our lane would look like: 
+```python
+default_platform(:android)
 
+platform :android do
+
+  desc "Deploy a beta version to the Google Play"
+  lane :beta do
+    gradle(task: "clean bundleRelease")
+    upload_to_play_store(track: 'beta')
+  end
+  
+end
+```
+- We require a **Keystore file (.jks)** for signing APK/App Bundle before publishing app to the Google Play. Once all of these are done we will create a worflow file **release.yml** that will look like the following:
+```yaml
+name: Deploy
+
+on:
+    ## add branches here for eg. release/beta
+jobs:
+    
+    # add runner other jobs here
+
+      - name: Configure Keystore
+        run: |
+        echo "$ANDROID_KEYSTORE_FILE" > keystore.jks.b64
+        base64 -d -i keystore.jks.b64 > app/keystore.jks
+        echo "storeFile=keystore.jks" >> keystore.properties
+        echo "keyAlias=$KEYSTORE_KEY_ALIAS" >> keystore.properties
+        echo "storePassword=$KEYSTORE_STORE_PASSWORD" >> keystore.properties
+        echo "keyPassword=$KEYSTORE_KEY_PASSWORD" >> keystore.properties
+        env:
+        ANDROID_KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
+        KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+        KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+        KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+
+      - name: Create Google Play Config file
+        run : |
+        echo "$PLAY_CONFIG_JSON" > play_config.json.b64
+        base64 -d -i play_config.json.b64 > play_config.json
+        env:
+        PLAY_CONFIG_JSON: ${{ secrets.PLAY_CONFIG_JSON }}
+
+      - name: Distribute app to Release track # Executing our release lane
+        run: bundle exec fastlane release
+```
+
+- While deploying we need to keep in mind that we will have a KMP project by the time we finish it and hence we will have to modify our existing pipeline to add support for iOS part of the app as well whose runner will be *macos-latest*. Moreover since the idea is to implement **Multiplatform** and not just **Multimobile** jobs related to windows, linux will also have to be developed. A general implementation would look like this :
+```yaml
+jobs:
+  releaseLinuxAndroidWeb:
+    name: Release - Android, Linux, Web
+    runs-on: ubuntu-latest
+
+    steps:
+      
+      # checkout repository and JDK setup here
+
+      - name: Grant Permission to Execute Gradle and scripts
+        run: |
+          chmod +x gradlew
+          chmod +x buildApps.sh
+
+      - name: Build with Gradle
+        uses: gradle/gradle-build-action@v2
+
+      - name: Build App
+        run: ./buildApps.sh
+
+      - name: Attach Android and Linux App 🚀
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            distributions/chakt-android.apk
+            distributions/chakt-linux-x64.jar
+
+      - name: Publish Web app 🚀
+        uses: JamesIves/github-pages-deploy-action@v4.3.3
+        with:
+          branch: gh-pages
+          folder: distributions/chakt-web
+```
 
 ## **2.7 Update wallet framework to be make use of Mifos' Android SDK**
+- 
 
 ## **2.8 Complete migration of Java code to Kotlin**
 In the process of migrating to Kotlin, we significantly enhance our codebase by adopting Kotlin's more concise syntax, which notably reduces boilerplate code. Furthermore, Kotlin's built-in null safety and powerful features like coroutines and flows add substantial value to our development process. However, our ultimate objective is to transition our project to **Kotlin Multiplatform** (KMM). To achieve this, it's imperative that our entire codebase is converted to Kotlin. At the time of drafting this proposal, **only 1.6%** of the project remains to be migrated.
@@ -208,8 +299,17 @@ At the time of drafting this proposal the following files are still haven't been
 Although this task is not of immediate high priority, it plays a critical role in the grand scheme of our project objectives. Therefore, I plan to submit pull requests for these changes as promptly as possible. Should I encounter any challenges in completing this task before the Google Summer of Code timeframe, I am committed to resolving it before the conclusion of the first coding phase.
 
 # **2.9 Improving the security framework**  
+- 
 
 # **2.10 Exploring PoC Architecture for Open Wallet Foundation Alignment** 
+- The OWF aims to set best practices for digital wallet technology through collaboration on standards-based OSS components that issuers, wallet providers and relying parties can use to bootstrap implementations that preserve user choice, security and privacy all of which aligns with Mifos' Initiative of advancing the **Sustainable Development Goal** of **No Poverty**
+
+- Mifos already has a small project titled [Alignment with Emerging Open Wallet Standards 
+](https://mifosforge.jira.com/wiki/spaces/RES/pages/3532095546/Google+Summer+of+Code+2024+Ideas#Alignment-with-Emerging-Open-Wallet-Standards)
+whose objective is to research the different open wallet standards emerging from the Open Wallet Foundation, GovStack wallet building block, and utilize other digital public goods for identity including Inji from MOSIP and the Gluu Project
+
+- The above idea is no way different from what we have to do and hence this reseach will compliment mine in every possible way. During the GSoC I will explore the current status of the specifications, standards and design a POC architecture for mobile wallet that aligns with the standards and specifications in their current state
+
 
 # **3. Contributions to Mifos**
 Ever since GSoC 2023 concluded, I have kept contributing to Mifos and this contribution is not just limited to **Mobile Wallet** but also extends to **Mifos Mobile** and **Mifos Passcode**
@@ -218,33 +318,35 @@ Below are links to some of my notable contributions at the time of submitting th
 
 ### **Merged Pull Requests** for Mobile Wallet
 <ul>
-1. <a href="https://github.com/openMF/mobile-wallet/pull/1579" >PR #1579: Migrated Finance Screen to compose</a>
+1. <a href="https://github.com/openMF/mobile-wallet/pull/1591" >PR #1591: Migrated Bank Account Detail Screen to compose</a>
 <br>
-2. <a href="https://github.com/openMF/mobile-wallet/pull/1548" >PR #1548: Migrated Payments Screen to compose</a>
+2. <a href="https://github.com/openMF/mobile-wallet/pull/1579" >PR #1579: Migrated Finance Screen to compose</a>
 <br>
-3. <a href="https://github.com/openMF/mobile-wallet/pull/1547" >PR #1547: Migrated Profile Screen to compose</a>
+3. <a href="https://github.com/openMF/mobile-wallet/pull/1548" >PR #1548: Migrated Payments Screen to compose</a>
 <br>
-4. <a href="https://github.com/openMF/mobile-wallet/pull/1508" >PR #1508: Migrated Settings Screen to compose</a>
+4. <a href="https://github.com/openMF/mobile-wallet/pull/1547" >PR #1547: Migrated Profile Screen to compose</a>
 <br>
-5. <a href="https://github.com/openMF/mobile-wallet/pull/1538" >PR #1538: Migrated FAQ Screen to compose</a>
+5. <a href="https://github.com/openMF/mobile-wallet/pull/1508" >PR #1508: Migrated Settings Screen to compose</a>
 <br>
-6. <a href="https://github.com/openMF/mobile-wallet/pull/1426" >PR #1426: Migrated Login Screen to compose</a>
+6. <a href="https://github.com/openMF/mobile-wallet/pull/1538" >PR #1538: Migrated FAQ Screen to compose</a>
 <br>
-7. <a href="https://github.com/openMF/mobile-wallet/pull/1573" >PR #1573: Introduced Detekt for static code analysis</a>
+7. <a href="https://github.com/openMF/mobile-wallet/pull/1426" >PR #1426: Migrated Login Screen to compose</a>
 <br>
-8. <a href="https://github.com/openMF/mobile-wallet/pull/1524" >PR #1524: Rectified Github Workflow of the project</a>
+8. <a href="https://github.com/openMF/mobile-wallet/pull/1573" >PR #1573: Introduced Detekt for static code analysis</a>
 <br>
-9. <a href="https://github.com/openMF/mobile-wallet/pull/1526" >PR #1526: Rectified Authentication Logic of the project</a>
+9. <a href="https://github.com/openMF/mobile-wallet/pull/1524" >PR #1524: Rectified Github Workflow of the project</a>
 <br>
-10. <a href="https://github.com/openMF/mobile-wallet/pull/1462" >PR #1462: Fixed app crash when selecting FAQ</a>
+10. <a href="https://github.com/openMF/mobile-wallet/pull/1526" >PR #1526: Rectified Authentication Logic of the project</a>
 <br>
-11. <a href="https://github.com/openMF/mobile-wallet/pull/1510" >PR #1510: API package from java to kotlin</a>
+11. <a href="https://github.com/openMF/mobile-wallet/pull/1462" >PR #1462: Fixed app crash when selecting FAQ</a>
 <br>
-12. <a href="https://github.com/openMF/mobile-wallet/pull/1540" >PR #1540: Checkstyle for all modules</a>
+12. <a href="https://github.com/openMF/mobile-wallet/pull/1510" >PR #1510: API package from java to kotlin</a>
+<br>
+13. <a href="https://github.com/openMF/mobile-wallet/pull/1540" >PR #1540: Checkstyle for all modules</a>
 <br>
 </ul>
 
-- I have a total of **35 Merged Pull Requests** in mobile wallet. You can find all of my merged PRs [here](https://github.com/openMF/mobile-wallet/pulls?page=1&q=is%3Amerged+is%3Apr+author%3APratyushSingh07)
+- I have a total of **36 Merged Pull Requests** in mobile wallet. You can find all of my merged PRs [here](https://github.com/openMF/mobile-wallet/pulls?page=1&q=is%3Amerged+is%3Apr+author%3APratyushSingh07)
 
 ###  **Merged Pull Requests** for Mifos Mobile
 <ul>
@@ -274,7 +376,7 @@ Below are links to some of my notable contributions at the time of submitting th
 
 ### **Issues Reported**
 - I had opened a total of **15 issues** that mainly focused on bugs that were present in the codebase and also on the features that were absent from the mifos mobile at the time . Some of them are still open and have PRs either by me or from my fellow contributors 
-- All of my open and closed issues can be accessed from [here](https://github.com/openMF/mifos-mobile/issues/created_by/PratyushSingh07) 
+- All of my open and closed issues can be accessed from [here](https://github.com/openMF/mobile-wallet/issues/created_by/PratyushSingh07) 
 
 Besides contributing to the various projects, I have also dedicated my time to reviewing Pull Requests raised by my fellow contributors and helping them onboard in our open source community. Ever since last years GSoC concluded, I have been actively connected to Mifos
 
