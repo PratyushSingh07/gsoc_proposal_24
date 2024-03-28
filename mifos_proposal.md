@@ -21,7 +21,7 @@ Mentors:
 - [Rajan Maurya](https://github.com/therajanmaurya) 
 - [Avinash Vijayvargiya](https://github.com/avivijay19)
 
-<br><br><br><br><br><br><br><br>
+<br><br><br><br><br><br><br><br><br><br><br><br>
 
 # Contents     
 1. [Project Idea](#1-project-idea)
@@ -38,10 +38,10 @@ Mentors:
     2.10 [Exploring PoC Architecture for Open Wallet Foundation Alignment](#210-exploring-poc-architecture-for-open-wallet-foundation-alignment)<br>
 3. [Contributions To Mifos](#3-contributions-to-mifos)<br>
 4. [Week Wise Breakdown](#4-week-wise-breakdown)<br>
-    4.1  [Community Bonding Period (4 May - 28 May)](#41-community-bonding-period-4-may---28-may)<br>
-    4.2  [Phase 1 (29 May - 9 July)](#42-phase-1-29-may---9-july)<br>
-    4.3  [Phase 2 (14 July - 21 Aug)](#43-phase-2-14-july---21-aug)<br>
-    4.4 [Post phase 2 (After Aug 28)](#44-post-phase-2-after-aug-28)
+    4.1  [Community Bonding Period (1 May - 26 May)](#41-community-bonding-period-1-may---26-may)<br>
+    4.2  [Phase 1 (27 May - 12 July)](#42-phase-1-27-may---12-july)<br>
+    4.3  [Phase 2 (12 July - 26 Aug)](#43-phase-2-12-july---26-aug)<br>
+    4.4 [Post phase 2 (After Aug 26)](#44-post-phase-2-after-aug-26)
 5.  [Why Am I The Right Person](#5-why-am-i-the-right-person)
 6.  [Current Area of Study](#6-current-area-of-study)
 7.  [Contact Information](#7-contact-information)
@@ -173,6 +173,7 @@ data class NotificationPayload(
 - After this is done we will call *AppNavHost* inside our `MainActivity.kt` file.This will lay the foundation for initial setup and will be crucial when we refactor the **Bottom Navigation** to compose. 
 
 - Since we already have a lot of resusable components in our project, migrating the project to compose while integrating NavigationCompose shouldn't take a lot of time. I will communicate any UI revamp ideas with my mentor and will implement the same if he gives me a nod
+<br><br><br>
 
 ## **2.5 Basic implementation of multi-platform**
 - Implementing *Kotlin Multiplatform* (KMP) is another huge undertaking in this years GSoC. Once implemented, it will upgrade our native android application to a cross platform application
@@ -246,6 +247,7 @@ jobs:
 ```
 
 - While deploying we need to keep in mind that we will have a KMP project by the time we finish it and hence we will have to modify our existing pipeline to add support for iOS part of the app as well whose runner will be *macos-latest*. Moreover since the idea is to implement **Multiplatform** and not just **Multimobile** jobs related to windows, linux will also have to be developed. A general implementation would look like this :
+<br><br><br><br>
 ```yaml
 jobs:
   releaseLinuxAndroidWeb:
@@ -282,24 +284,45 @@ jobs:
 ```
 
 ## **2.7 Update wallet framework to be make use of Mifos' Android SDK**
-- 
+- Currently the mobile wallet is consuming the native code to make REST calls which leads to a significant amount of boiler plate code. This however can be reduced by consuming the Android SDK developed by mifos. This integration can offer considerable benefits in terms of development efficiency, as it eliminates much of the repetitive and time-consuming coding work associated with making REST calls.
+
+- To integrate this we will have to add dependencies for these 2 SDKs: 
+```kotlin
+    dependencies {
+        implementation ("com.github.openMF:mifos-android-sdk-arch:$sdk_Version") 
+        implementation ("com.github.openMF:fineract-client:$fineractClientVersion")
+    }
+```
+- All of the retrofit calls are written in [Mifos Android SDK](https://github.com/openMF/fineract-android-sdk) and all the corresponding data classes are present in [Fineract Client](https://github.com/openMF/fineract-client) and as such complement each other. These two SDK have different models and hence we will have to create **Mappers** for converting one model to another
+
+- However, [Fineract Client](https://github.com/openMF/fineract-client) is still in *java* and will be a hurdle in our plans of KMM implementation. So we will have to migrate this to Kotlin and in the process replace all of the payload class with data class. Moreover all the **REST** calls are returning an *Observable* which are subsequently being handle by **RxJava** and hence keeping in mind our plans for KMM we will have to use Kotlin **Coroutines** and **Flows** instead
+
+- Another point to consider before we start implementing this is Ktor. To add support for KMM it will be better if we get rid of Retrofit 
+on the way. The above mentioned points should be pondered upon before we decide to integrate it into our project. If the need arises then I will migrate the SDK to Java, this of course is a stretch goal and will be worked upon only after my discussion with the assigned mentor  
 
 ## **2.8 Complete migration of Java code to Kotlin**
-In the process of migrating to Kotlin, we significantly enhance our codebase by adopting Kotlin's more concise syntax, which notably reduces boilerplate code. Furthermore, Kotlin's built-in null safety and powerful features like coroutines and flows add substantial value to our development process. However, our ultimate objective is to transition our project to **Kotlin Multiplatform** (KMM). To achieve this, it's imperative that our entire codebase is converted to Kotlin. At the time of drafting this proposal, **only 1.6%** of the project remains to be migrated.
-When I first started contributing to this project, a considerable portion needed to be transitioned from Java to Kotlin. Therefore, I initiated the conversion process on a package-by-package basis, systematically working towards our goal of a fully Kotlin-based codebase.
+- In the process of migrating to Kotlin, we significantly enhance our codebase by adopting Kotlin's more concise syntax, which notably reduces boilerplate code. Furthermore, Kotlin's built-in null safety and powerful features like coroutines and flows add substantial value to our development process. However, our ultimate objective is to transition our project to **Kotlin Multiplatform** (KMM). To achieve this, it's imperative that our entire codebase is converted to Kotlin. At the time of drafting this proposal, **only 1.6%** of the project remains to be migrated.
 
-At the time of drafting this proposal the following files are still haven't been migrated to kotlin: 
-- <font color="green">VerifyUser.java</font>
-- <font color="green">WrapContentHeightViewPager.java</font>
-- <font color="green">FetchAccounts.java</font>
-- <font color="green">FetchAccountTransaction.java</font>
-- <font color="green">RegisterUser.java</font>
-- <font color="green">DownloadTransactionReceipt.java</font>
+- When I first started contributing to this project, a considerable portion needed to be transitioned from Java to Kotlin. Therefore, I initiated the conversion process on a package-by-package basis, systematically working towards our goal of a fully Kotlin-based codebase. At the time of drafting this proposal the following files are still haven't been migrated to kotlin: 
+    - <font color="red">VerifyUser.java</font>
+    - <font color="red">WrapContentHeightViewPager.java</font>
+    - <font color="red">FetchAccounts.java</font>
+    - <font color="red">FetchAccountTransaction.java</font>
+    - <font color="red">RegisterUser.java</font>
+    - <font color="red">DownloadTransactionReceipt.java</font>
 
-Although this task is not of immediate high priority, it plays a critical role in the grand scheme of our project objectives. Therefore, I plan to submit pull requests for these changes as promptly as possible. Should I encounter any challenges in completing this task before the Google Summer of Code timeframe, I am committed to resolving it before the conclusion of the first coding phase.
+- Although this task is not of immediate high priority, it plays a critical role in the grand scheme of our project objectives. Therefore, I plan to submit pull requests for these changes as promptly as possible. Should I encounter any challenges in completing this task before the Google Summer of Code timeframe, I am committed to resolving it before the conclusion of the first coding phase.
 
 # **2.9 Improving the security framework**  
-- 
+- **Mifos Pay** is a banking application that communicates with a lot of endpoints and third party libraries and as such we need to lay emphasis on its security framework. Some of the points to make our app secure are :
+
+- *Securing API Keys using Android NDK*: There are different ways in which API keys can be kept hidden and one such way of storing keys in the native C/C++ class and accessing them in our Java classes. Doing this will add an extra layer of obfuscation to the keys. **Mifos Passcode** has already inculcated this feature and the same can be replicated by following this [article](https://medium.com/@abhi007tyagi/storing-api-keys-using-android-ndk-6abb0adcadad)
+
+- *Don’t process any payments on a rooted device*: Mifos Pay will have in app payment feature besides some other critical tasks. Automatically disable these features on a rooted device. Because the rooted device can change your code at runtime and alter the behavior of it. We can obviously check for such devices using the code [here](https://stackoverflow.com/questions/1101380/determine-if-running-on-a-rooted-device/8097801#8097801)
+
+- *Remove unecessary logs*:  Debugging code is fine for a debug build but I will make sure to remove such logs that contains *service urls*, *response body*, *usernames*, *crashes* etc from the release apk otherwise everyone can see these logs on their computer and this logs could contain sensitive data that if it’s misused, it would be a nightmare for us. Instead of removing logs manually from each part of the code we can use **Timber** which will make you enable or disable logs in a centralized place
+
+- *Code Obfuscation*: We have already enabled Proguard/R8 in our project but it will be better to use it with [DexGuard](https://www.guardsquare.com/dexguard) which is its specialized sibling that can additionally encrypt/obfuscate the strings and classes for us. This will save us from manually obfuscating our string with Base64 encoding
 
 # **2.10 Exploring PoC Architecture for Open Wallet Foundation Alignment** 
 - The OWF aims to set best practices for digital wallet technology through collaboration on standards-based OSS components that issuers, wallet providers and relying parties can use to bootstrap implementations that preserve user choice, security and privacy all of which aligns with Mifos' Initiative of advancing the **Sustainable Development Goal** of **No Poverty**
@@ -315,7 +338,7 @@ whose objective is to research the different open wallet standards emerging from
 Ever since GSoC 2023 concluded, I have kept contributing to Mifos and this contribution is not just limited to **Mobile Wallet** but also extends to **Mifos Mobile** and **Mifos Passcode**
 
 Below are links to some of my notable contributions at the time of submitting this proposal : 
-
+<br><br><br>
 ### **Merged Pull Requests** for Mobile Wallet
 <ul>
 1. <a href="https://github.com/openMF/mobile-wallet/pull/1591" >PR #1591: Migrated Bank Account Detail Screen to compose</a>
@@ -533,18 +556,28 @@ Yes, I have visited all of mifos's gitter channel and my id was <a href="(@praty
 I have been contributing to Open Source for quite some time and here are some of my contributions:
 <br>
 
-1. Dare2Change : 
+1. *Dare2Change* : 
     - It's an all in one android application to enhance your productivity and I got to work on this as a part of SLoP 2022
     - Revamped the complete UI of the application and introduced a dark mode theme 
     - My contributions for Dare2Change: [check here](https://github.com/coder2699/Dare2Change/pulls?q=is%3Apr+author%3APratyushSingh07)
-2. Anki-Android : 
+2. *Anki-Android* : 
     - There were certain  <font color="green">@KotlinCleanup</font> annotations in the codebase with messages such as *make data not null* and *simplify through scope functions*
     - I opened a few pull requests adhering to above mentioned messages
     - My contributions to Anki-Android : [check here](https://github.com/ankidroid/Anki-Android/pulls?q=is%3Apr+author%3APratyushSingh07+is%3Aclosed+)
-3. Catroid : 
+3. *Catroid* : 
     - It is written predominantly in JAVA and hence refactoring the existing codebase to Kotlin is a vital task
     - I refactored certain files to kotlin 
     - My contributions for Catroid: [check here](https://github.com/Catrobat/Catroid/pulls/PratyushSingh07)
+
+4. *Mifos Mobile*: 
+    - Contributed to this as a part of my GSoC last year and primarily worked on refactoring the project
+    - Introduced *MVVM*, *Hilt*, *Coroutines*, *Flows* among other enhancements
+    - My contributions for Mifos Mobile: [check here](https://github.com/openMF/mifos-mobile/pulls?page=1&q=is%3Apr+is%3Amerged+author%3APratyushSingh07)
+<br><br><br>
+5. *Mifos Passcode*: 
+    - Passcode library being used across Mifos' android project
+    - Migrated the library from java to kotlin & also migrated it to compose
+    - My contributions for Mifos Passcode: [check here](https://github.com/openMF/mifos-passcode/pulls?q=is%3Apr+is%3Aclosed+author%3Apratyushsingh07)
 
 # **12. Experience with Angular/Java/Spring/Hibernate/MySQL/Android** 
 Yes, I do have experience with Android and Java and have built projects centered around them. I have decent knowledge of MySQL and SQLite Databases.I have built a full stack application during the course of my internship by using Angular as the frontend and Spring Boot for developing RESTful APIs.
@@ -552,14 +585,11 @@ Yes, I do have experience with Android and Java and have built projects centered
 
 # **13. Other Commitments**
 I am fully committed to enhancing the Mobile Wallet platform during the upcoming summer as I do not have any other conflicting commitments.
-<br><br>
 
 # **14. What motivates me to work with Mifos for GSoC** 
 Mifos Initiative is making a significant difference in the world by providing financial inclusion to people who would otherwise be excluded from the formal financial system. This mission is truly inspiring, and being a part of it through the Google Summer of Code program is a privilege.
 From a professional point of view mifos has a vibrant community of developers, volunteers, and supporters who are passionate about the mission of the organization. It's motivating to be a part of a community that is so dedicated to making a positive impact on the world.Besides
-Google Summer of Code is a fantastic opportunity for students to gain real-world experience working on open-source projects. Mifos Initiative's participation in this program shows that they are committed to helping the next generation of developers like me succeed and contribute to something that would impact lives of billions around the globe.The work that we as a students do during the Google Summer of Code program can have a lasting impact on the Mifos Initiative and the people it serves. Knowing that the work you do can make a real difference in people's lives is incredibly rewarding.
-
-Mifos Initiative's commitment to open-source software is essential for the sustainability of the financial inclusion ecosystem. By making their software freely available, they are enabling other organizations to provide financial services to underserved communities.
+Google Summer of Code is a fantastic opportunity for students to gain real-world experience working on open-source projects. Mifos Initiative's participation in this program shows that they are committed to helping the next generation of developers like me succeed and contribute to something that would impact lives of billions around the globe.The work that we as a students do during the Google Summer of Code program can have a lasting impact on the Mifos Initiative and the people it serves. Knowing that the work you do can make a real difference in people's lives is incredibly rewarding
 <br>
 
 # **15. Previous Participation in GSoC**
